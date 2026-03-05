@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vault — Stake Account Manager</title>
+    <link rel="icon" href="https://stake.ac/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { theme: { extend: { colors: { v: { bg: '#0a0a0f', surf: '#12121a', card: '#161620', border: '#1e1e2e', gold: '#c9a84c', 'gd': '#d4b054', 'gdd': '#8a6f30', profit: '#22c55e', loss: '#ef4444', tx: '#e8e8e8', muted: '#6b7280', inp: '#0e0e17' } }, fontFamily: { d: ['Bebas Neue', 'sans-serif'], b: ['DM Sans', 'sans-serif'] } } } }</script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        body {
+            background: #0a0a0f;
+            font-family: 'DM Sans', sans-serif;
+            color: #e8e8e8;
+            margin: 0;
+            min-height: 100vh
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0f
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e1e2e;
+            border-radius: 2px
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #c9a84c44
+        }
+
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0
+        }
+
+        .gb {
+            border: 1px solid #c9a84c25
+        }
+
+        .gg {
+            box-shadow: 0 0 0 1px #c9a84c15, 0 4px 32px #c9a84c0a, 0 2px 16px #00000060
+        }
+
+        .ch {
+            transition: border-color .18s, box-shadow .18s
+        }
+
+        .ch:hover {
+            border-color: #c9a84c44 !important;
+            box-shadow: 0 0 0 1px #c9a84c18, 0 8px 40px #00000088
+        }
+
+        .fi {
+            animation: fi .22s ease
+        }
+
+        @keyframes fi {
+            from {
+                opacity: 0;
+                transform: translateY(5px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .pp {
+            color: #22c55e;
+            text-shadow: 0 0 10px #22c55e33
+        }
+
+        .pl {
+            color: #ef4444;
+            text-shadow: 0 0 10px #ef444433
+        }
+
+        .ta {
+            border-bottom: 2px solid #c9a84c;
+            color: #c9a84c
+        }
+
+        select option {
+            background: #12121a;
+            color: #e8e8e8
+        }
+
+        .carbon {
+            background-image: linear-gradient(rgba(255, 255, 255, .012) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .012) 1px, transparent 1px);
+            background-size: 32px 32px
+        }
+
+        .spin {
+            animation: spin 1s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* Stake brand gradient on "VAULT" */
+        .vault-text {
+            background: linear-gradient(135deg, #c9a84c 0%, #e8c96a 50%, #c9a84c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text
+        }
+
+        /* glowing gold divider */
+        .gold-line {
+            background: linear-gradient(90deg, transparent, #c9a84c55, transparent);
+            height: 1px;
+            width: 100%
+        }
+    </style>
+</head>
+
+<body class="bg-v-bg">
+    <div id="root"></div>
+
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- React 18 + Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // ─── SUPABASE CONFIG ─────────────────────────────────────────────────────────
+        // Project: vault-stake-manager | Region: ap-south-1
+        const SUPABASE_URL = 'https://folykcuwsmpsacsxwdxz.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvbHlrY3V3c21wc2Fjc3h3ZHh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2OTYyOTgsImV4cCI6MjA4ODI3MjI5OH0.sg_0Dac4NepFkwYOJarn0Sne8pY3X7juH3NcXr3rnFA';
+
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        // ─── CONSTANTS ────────────────────────────────────────────────────────────────
+        const CUR = '$';
+        const VIP = ['Bronze', 'Silver', 'Gold', 'Platinum 1', 'Platinum 2', 'Platinum 3', 'Platinum 4'];
+
+        // ─── UTILS ────────────────────────────────────────────────────────────────────
+        const fmt = n => `${CUR}${Number(n || 0).toLocaleString('en-IN')}`;
+
+        const pnl = a => {
+            const inc = Number(a.rain || 0) + (a.has_kyc ? Number(a.crypto_bonus || 0) : 0) +
+                Number(a.monthly_bonus || 0) + Number(a.weekly_bonus || 0) + Number(a.bonus_amount || 0) + Number(a.kick_codes || 0);
+            const exp = Number(a.wag_cost || 0) + Number(a.claimer_cost || 0) + Number(a.credit_cost || 0);
+            return inc - exp;
+        };
+
+        const tsFmt = t => {
+            if (!t) return '';
+            const d = new Date(t);
+            return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        };
+
+        // ─── STAKE.AC LOGO SVG (inline, pixel-perfect recreation) ────────────────────
+        const StakeLogo = ({ size = 28 }) => (
+            <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" rx="12" fill="#1a1a27" />
+                <text x="50" y="72" textAnchor="middle" fontFamily="'Bebas Neue',sans-serif" fontSize="72" fill="#c9a84c" letterSpacing="2">S</text>
+            </svg>
+        );
+
+        const StakeWordmark = () => (
+            <div className="flex items-center gap-2">
+                <img src="https://stake.ac/favicon.ico" alt="Stake" width="26" height="26"
+                    className="rounded-md"
+                    onError={e => { e.target.style.display = 'none'; }}
+                />
+                <div className="flex items-center gap-0.5">
+                    <span className="font-d text-[26px] leading-none vault-text tracking-[0.12em]">VAULT</span>
+                </div>
+            </div>
+        );
+
+        // ─── ICONS ────────────────────────────────────────────────────────────────────
+        const Ico = {
+            plus: () => <svg width="13" height="13" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="2.5" fill="none"><line x1="7" y1="1" x2="7" y2="13" /><line x1="1" y1="7" x2="13" y2="7" /></svg>,
+            edit: () => <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
+            out: () => <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>,
+            msg: () => <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>,
+            bar: () => <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>,
+            menu: () => <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>,
+            del: () => <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" /></svg>,
+        };
+
+        // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+        function LoginScreen() {
+            const [email, setEmail] = useState('');
+            const [pw, setPw] = useState('');
+            const [err, setErr] = useState('');
+            const [busy, setBusy] = useState(false);
+
+            const login = async e => {
+                e.preventDefault(); setErr(''); setBusy(true);
+                try {
+                    // Race login against 10s timeout so button never freezes
+                    const timeout = new Promise((_, rej) =>
+                        setTimeout(() => rej(new Error('Request timed out. Check your internet connection and try again.')), 10000));
+                    const { data, error } = await Promise.race([
+                        sb.auth.signInWithPassword({ email: email.trim(), password: pw }),
+                        timeout,
+                    ]);
+                    if (error) throw error;
+                    // Whitelist check (also timeout-protected)
+                    const { data: wl } = await Promise.race([
+                        sb.from('whitelist').select('id').eq('email', email.trim().toLowerCase()).maybeSingle(),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('Whitelist check timed out.')), 8000)),
+                    ]);
+                    if (!wl) { sb.auth.signOut(); throw new Error('Access denied — your email is not on the whitelist.'); }
+                } catch (ex) {
+                    setErr(ex.message || 'Login failed.');
+                } finally {
+                    setBusy(false); // ALWAYS release button, no matter what
+                }
+            };
+
+            return (
+                <div className="min-h-screen carbon flex items-center justify-center p-4">
+                    {/* ambient glow */}
+                    <div className="fixed inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 40% at 50% 0%,#c9a84c08 0%,transparent 70%)' }} />
+                    <div className="w-full max-w-sm fi relative z-10">
+                        {/* Logo */}
+                        <div className="text-center mb-8">
+                            <div className="flex items-center justify-center mb-4">
+                                <img src="https://stake.ac/favicon.ico" alt="Stake" width="48" height="48" className="rounded-xl shadow-lg"
+                                    onError={e => { e.currentTarget.style.display = 'none'; }} />
+                            </div>
+                            <h1 className="font-d text-6xl vault-text tracking-[0.2em] leading-none">VAULT</h1>
+                            <p className="text-v-muted text-xs mt-2 tracking-widest uppercase">Stake Account Manager</p>
+                            <div className="gold-line mt-3 mx-auto" style={{ maxWidth: 120 }} />
+                        </div>
+                        {/* Card */}
+                        <div className="bg-v-surf rounded-2xl p-6 gb gg relative overflow-hidden">
+                            <div className="absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg,transparent,#c9a84c55,transparent)' }} />
+                            <form onSubmit={login} className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-[0.15em] text-v-muted mb-1.5">Email Address</label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                                        className="w-full bg-v-inp border border-v-border rounded-xl px-3.5 py-2.5 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors placeholder-v-muted/50"
+                                        placeholder="admin@example.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-[0.15em] text-v-muted mb-1.5">Password</label>
+                                    <input type="password" value={pw} onChange={e => setPw(e.target.value)} required
+                                        className="w-full bg-v-inp border border-v-border rounded-xl px-3.5 py-2.5 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors placeholder-v-muted/50"
+                                        placeholder="••••••••" />
+                                </div>
+                                {err && <div className="text-v-loss text-xs bg-red-950/30 border border-red-900/30 rounded-xl px-3.5 py-2.5 leading-relaxed">{err}</div>}
+                                <button type="submit" disabled={busy}
+                                    className="w-full bg-v-gold text-v-bg font-d text-xl tracking-[0.18em] py-3 rounded-xl hover:bg-v-gd active:scale-[.98] transition-all disabled:opacity-50 mt-1 shadow-lg"
+                                    style={{ boxShadow: '0 4px 24px #c9a84c30' }}>
+                                    {busy ? 'VERIFYING…' : 'ACCESS VAULT'}
+                                </button>
+                            </form>
+                            <p className="text-center text-v-muted/60 text-[11px] mt-4">Invite-only • Contact admin for access</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── NAVBAR ───────────────────────────────────────────────────────────────────
+        function Navbar({ user, onMenu }) {
+            return (
+                <header className="h-14 bg-v-surf border-b border-v-border flex items-center px-4 gap-3 z-50 relative shrink-0">
+                    <div className="absolute inset-x-0 bottom-0 gold-line" />
+                    <button onClick={onMenu} className="md:hidden text-v-muted hover:text-v-gold p-1 transition-colors"><Ico.menu /></button>
+                    <StakeWordmark />
+                    <div className="w-px h-5 bg-v-border hidden sm:block mx-1" />
+                    <span className="text-v-muted text-[11px] tracking-wider hidden sm:block">PRIVATE DASHBOARD</span>
+                    <div className="ml-auto flex items-center gap-2.5">
+                        <div className="hidden sm:flex items-center gap-2 bg-v-inp border border-v-border rounded-lg px-2.5 py-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-v-profit" style={{ boxShadow: '0 0 6px #22c55e' }} />
+                            <span className="text-v-muted text-xs truncate max-w-[160px]">{user?.email}</span>
+                        </div>
+                        <button onClick={() => sb.auth.signOut()}
+                            className="text-v-muted hover:text-v-loss border border-v-border hover:border-red-900/50 px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all">
+                            <Ico.out /><span className="hidden sm:block">Sign Out</span>
+                        </button>
+                    </div>
+                </header>
+            );
+        }
+
+        // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+        function Sidebar({ accounts, activeId, onSelect, onAdd, onView, view, open }) {
+            return (
+                <aside className={`${open ? 'flex' : 'hidden md:flex'} flex-col w-64 bg-v-surf border-r border-v-border h-full shrink-0`}>
+                    {/* Tabs */}
+                    <div className="flex border-b border-v-border shrink-0">
+                        {[
+                            { key: 'accounts', label: 'Accounts', icon: <Ico.bar /> },
+                            { key: 'summary', label: 'Summary', icon: null },
+                            { key: 'messages', label: 'Chat', icon: <Ico.msg /> },
+                        ].map(t => (
+                            <button key={t.key} onClick={() => onView(t.key)}
+                                className={`flex-1 py-3 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 transition-colors ${view === t.key ? 'ta' : 'text-v-muted hover:text-v-tx'}`}>
+                                {t.icon}{t.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Account list */}
+                    <div className="flex-1 overflow-y-auto">
+                        {accounts.length === 0 && <p className="text-v-muted text-xs text-center py-8 px-4 leading-relaxed">No accounts yet.<br />Add your first Stake account.</p>}
+                        {accounts.map(a => {
+                            const p = pnl(a), active = a.id === activeId;
+                            return (
+                                <button key={a.id} onClick={() => onSelect(a.id)}
+                                    className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 border-l-2 transition-colors group ${active ? 'bg-v-card border-v-gold' : 'border-transparent hover:bg-v-card/60 hover:border-v-border'}`}>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium text-v-tx truncate group-hover:text-v-gold transition-colors">{a.stake_id || 'Unnamed'}</div>
+                                        <div className="text-[10px] text-v-muted mt-0.5">{a.vip_level}</div>
+                                    </div>
+                                    <span className={`text-xs font-semibold shrink-0 ${p >= 0 ? 'text-v-profit' : 'text-v-loss'}`}>
+                                        {p >= 0 ? '+' : ''}{fmt(p)}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Add button */}
+                    <div className="p-3 border-t border-v-border shrink-0">
+                        <button onClick={onAdd}
+                            className="w-full bg-v-gold/10 border border-v-gold/30 text-v-gold hover:bg-v-gold hover:text-v-bg transition-all text-sm py-2.5 rounded-xl flex items-center justify-center gap-2 font-medium"
+                            style={{ transition: 'all .18s' }}>
+                            <Ico.plus /> Add Account
+                        </button>
+                    </div>
+                </aside>
+            );
+        }
+
+        // ─── NUM INPUT ────────────────────────────────────────────────────────────────
+        const Num = ({ label, value, onChange, disabled }) => (
+            <div>
+                <label className="block text-[10px] uppercase tracking-wider text-v-muted mb-1.5">{label}</label>
+                <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-v-muted/70 text-xs pointer-events-none">{CUR}</span>
+                    <input type="number" value={value} onChange={e => onChange(e.target.value)} disabled={disabled} min="0" step="any"
+                        className="w-full bg-v-inp border border-v-border rounded-xl pl-5 pr-2 py-2 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+                        placeholder="0" />
+                </div>
+            </div>
+        );
+
+        // ─── SECTION HEADER ───────────────────────────────────────────────────────────
+        const SH = ({ label, color = 'text-v-gold' }) => (
+            <div className="flex items-center gap-2 mt-5 mb-3">
+                <span className={`text-[10px] uppercase tracking-[0.18em] font-semibold ${color}`}>{label}</span>
+                <div className="flex-1 h-px bg-v-border" />
+            </div>
+        );
+
+        // ─── ACCOUNT FORM ─────────────────────────────────────────────────────────────
+        function AccountForm({ initial, onSave, onCancel, saving }) {
+            const blank = { stake_id: '', vip_level: 'Bronze', wag_cost: 0, claimer_cost: 0, credit_cost: 0, rain: 0, has_kyc: false, crypto_bonus: 0, monthly_bonus: 0, weekly_bonus: 0, bonus_type: 'pre', bonus_amount: 0, kick_codes: 0 };
+            const [f, setF] = useState(initial || blank);
+            const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+            const p = pnl(f);
+
+            return (
+                <form onSubmit={e => { e.preventDefault(); onSave(f); }} className="fi space-y-1">
+                    {/* Identity */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[10px] uppercase tracking-wider text-v-muted mb-1.5">Stake ID</label>
+                            <input value={f.stake_id} onChange={e => set('stake_id', e.target.value)} required
+                                className="w-full bg-v-inp border border-v-border rounded-xl px-3.5 py-2 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors"
+                                placeholder="sakibmalik98" />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[10px] uppercase tracking-wider text-v-muted mb-1.5">VIP Level</label>
+                            <select value={f.vip_level} onChange={e => set('vip_level', e.target.value)}
+                                className="w-full bg-v-inp border border-v-border rounded-xl px-3.5 py-2 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors">
+                                {VIP.map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <SH label="Expenses" color="text-v-loss" />
+                    <div className="grid grid-cols-3 gap-3">
+                        <Num label="Wager Cost" value={f.wag_cost} onChange={v => set('wag_cost', v)} />
+                        <Num label="Claimer Cost" value={f.claimer_cost} onChange={v => set('claimer_cost', v)} />
+                        <Num label="Credit Cost" value={f.credit_cost} onChange={v => set('credit_cost', v)} />
+                    </div>
+
+                    <SH label="Income" color="text-v-profit" />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <Num label="Rain" value={f.rain} onChange={v => set('rain', v)} />
+                        <Num label="Monthly Bonus" value={f.monthly_bonus} onChange={v => set('monthly_bonus', v)} />
+                        <Num label="Weekly Bonus" value={f.weekly_bonus} onChange={v => set('weekly_bonus', v)} />
+                        <Num label="Kick Codes" value={f.kick_codes} onChange={v => set('kick_codes', v)} />
+                    </div>
+
+                    {/* Indian KYC toggle */}
+                    <div className="flex items-center gap-3 mt-3">
+                        <button type="button" onClick={() => set('has_kyc', !f.has_kyc)}
+                            style={{ width: '44px', height: '24px', borderRadius: '12px', background: f.has_kyc ? '#c9a84c' : '#1e1e2e', border: '1px solid', borderColor: f.has_kyc ? '#c9a84c' : '#1e1e2e', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0, padding: 0 }}>
+                            <span style={{ position: 'absolute', top: '3px', left: f.has_kyc ? '23px' : '3px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', transition: 'left .2s', display: 'block', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                        </button>
+                        <span className="text-xs text-v-muted">Indian KYC verified</span>
+                        {f.has_kyc && <span className="text-[10px] px-2 py-0.5 rounded-full bg-v-gold/15 text-v-gold border border-v-gold/30">Crypto unlocked</span>}
+                    </div>
+                    {f.has_kyc && (
+                        <div className="mt-2 fi">
+                            <Num label="Crypto Bonus" value={f.crypto_bonus} onChange={v => set('crypto_bonus', v)} />
+                        </div>
+                    )}
+
+                    {/* Pre/Post Monthly Bonus */}
+                    <div className="mt-4">
+                        <label className="block text-[10px] uppercase tracking-wider text-v-muted mb-2">Monthly Bonus Type</label>
+                        <div className="flex gap-2">
+                            {[{ v: 'pre', l: 'Pre-Monthly' }, { v: 'post', l: 'Post-Monthly' }].map(t => (
+                                <button key={t.v} type="button" onClick={() => set('bonus_type', t.v)}
+                                    className={`flex-1 text-xs py-2.5 rounded-xl border transition-all ${f.bonus_type === t.v ? 'border-v-gold text-v-gold bg-v-gold/10' : 'border-v-border text-v-muted hover:border-v-gold/40'}`}>
+                                    {t.l}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-2">
+                            <Num label={`${f.bonus_type === 'pre' ? 'Pre' : 'Post'}-Monthly Amount`} value={f.bonus_amount} onChange={v => set('bonus_amount', v)} />
+                        </div>
+                    </div>
+
+                    {/* Live PnL */}
+                    <div className={`mt-5 rounded-2xl border p-4 flex items-center justify-between ${p >= 0 ? 'border-green-900/30 bg-green-950/15' : 'border-red-900/30 bg-red-950/15'}`}>
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-v-muted">Live PnL Preview</p>
+                            <p className="text-[10px] text-v-muted mt-0.5">Income − Expenses</p>
+                        </div>
+                        <span className={`font-d text-4xl tracking-wide ${p >= 0 ? 'pp' : 'pl'}`}>{p >= 0 ? '+' : ''}{fmt(p)}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-3">
+                        <button type="button" onClick={onCancel}
+                            className="flex-1 border border-v-border text-v-muted hover:text-v-tx py-3 rounded-xl text-sm transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={saving}
+                            className="flex-1 bg-v-gold text-v-bg font-d text-xl tracking-[0.15em] py-2.5 rounded-xl hover:bg-v-gd transition-all disabled:opacity-50"
+                            style={{ boxShadow: '0 4px 20px #c9a84c25' }}>
+                            {saving ? 'SAVING…' : 'SAVE'}
+                        </button>
+                    </div>
+                </form>
+            );
+        }
+
+        // ─── ACCOUNT DETAIL ───────────────────────────────────────────────────────────
+        function AccountDetail({ acc, onEdit, onDelete }) {
+            const p = pnl(acc);
+            const ttlInc = Number(acc.rain || 0) + (acc.has_kyc ? Number(acc.crypto_bonus || 0) : 0) + Number(acc.monthly_bonus || 0) + Number(acc.weekly_bonus || 0) + Number(acc.bonus_amount || 0) + Number(acc.kick_codes || 0);
+            const ttlExp = Number(acc.wag_cost || 0) + Number(acc.claimer_cost || 0) + Number(acc.credit_cost || 0);
+            const Row = ({ l, v }) => (
+                <div className="flex justify-between items-center py-1.5 border-b border-v-border/40 last:border-0">
+                    <span className="text-xs text-v-muted">{l}</span>
+                    <span className="text-sm text-v-tx">{v}</span>
+                </div>
+            );
+            return (
+                <div className="fi space-y-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 className="font-d text-4xl vault-text tracking-wider">{acc.stake_id}</h2>
+                            <span className="inline-block mt-1 text-[11px] px-2.5 py-0.5 rounded-full border border-v-gold/30 text-v-gold bg-v-gold/10">{acc.vip_level}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={onEdit}
+                                className="flex items-center gap-1.5 text-xs text-v-muted hover:text-v-gold border border-v-border hover:border-v-gold/40 px-3 py-1.5 rounded-xl transition-all">
+                                <Ico.edit /> Edit
+                            </button>
+                            <button onClick={onDelete}
+                                className="flex items-center gap-1.5 text-xs text-v-muted hover:text-v-loss border border-v-border hover:border-red-900/40 px-3 py-1.5 rounded-xl transition-all">
+                                <Ico.del />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* PnL */}
+                    <div className={`rounded-2xl border p-5 flex items-center justify-between ${p >= 0 ? 'border-green-900/30 bg-green-950/15' : 'border-red-900/30 bg-red-950/15'}`}
+                        style={{ boxShadow: p >= 0 ? '0 0 30px #22c55e0a' : '0 0 30px #ef44440a' }}>
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-v-muted">Net PnL</p>
+                            <p className="text-[10px] text-v-muted mt-0.5">Total Income − Total Expenses</p>
+                        </div>
+                        <span className={`font-d text-5xl tracking-wide ${p >= 0 ? 'pp' : 'pl'}`}>{p >= 0 ? '+' : ''}{fmt(p)}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Expenses card */}
+                        <div className="bg-v-card rounded-2xl p-4 gb">
+                            <p className="text-[10px] uppercase tracking-widest text-v-loss mb-3">Expenses</p>
+                            <Row l="Wager Cost" v={fmt(acc.wag_cost)} />
+                            <Row l="Claimer Cost" v={fmt(acc.claimer_cost)} />
+                            <Row l="Credit Cost" v={fmt(acc.credit_cost)} />
+                            <div className="flex justify-between pt-2">
+                                <span className="text-xs font-medium text-v-loss">Total</span>
+                                <span className="text-sm font-semibold text-v-loss">{fmt(ttlExp)}</span>
+                            </div>
+                        </div>
+                        {/* Income card */}
+                        <div className="bg-v-card rounded-2xl p-4 gb">
+                            <p className="text-[10px] uppercase tracking-widest text-v-profit mb-3">Income</p>
+                            <Row l="Rain" v={fmt(acc.rain)} />
+                            {acc.has_kyc && <Row l="Crypto Bonus" v={fmt(acc.crypto_bonus)} />}
+                            <Row l="Monthly Bonus" v={fmt(acc.monthly_bonus)} />
+                            <Row l="Weekly Bonus" v={fmt(acc.weekly_bonus)} />
+                            <Row l={`${acc.bonus_type === 'pre' ? 'Pre' : 'Post'}-Monthly`} v={fmt(acc.bonus_amount)} />
+                            <Row l="Kick Codes" v={fmt(acc.kick_codes)} />
+                            <div className="flex justify-between pt-2">
+                                <span className="text-xs font-medium text-v-profit">Total</span>
+                                <span className="text-sm font-semibold text-v-profit">{fmt(ttlInc)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {acc.updated_by && (
+                        <p className="text-[11px] text-v-muted/60 text-right">Edited by <span className="text-v-muted">{acc.updated_by}</span> · {tsFmt(acc.updated_at)}</p>
+                    )}
+                </div>
+            );
+        }
+
+        // ─── SUMMARY ─────────────────────────────────────────────────────────────────
+        function Summary({ accounts }) {
+            const total = useMemo(() => accounts.reduce((s, a) => s + pnl(a), 0), [accounts]);
+            const byVip = useMemo(() => { const m = {}; VIP.forEach(v => m[v] = 0); accounts.forEach(a => { m[a.vip_level || 'Bronze'] = (m[a.vip_level || 'Bronze'] || 0) + 1; }); return m; }, [accounts]);
+            const sorted = useMemo(() => [...accounts].sort((a, b) => pnl(b) - pnl(a)), [accounts]);
+
+            const Stat = ({ label, val, sub, cls }) => (
+                <div className="bg-v-card rounded-2xl p-5 gb gg">
+                    <p className="text-[10px] uppercase tracking-widest text-v-muted mb-1">{label}</p>
+                    <p className={`font-d text-3xl tracking-wide ${cls || 'text-v-tx'}`}>{val}</p>
+                    {sub && <p className="text-[11px] text-v-muted mt-1">{sub}</p>}
+                </div>
+            );
+
+            return (
+                <div className="fi space-y-6">
+                    <h2 className="font-d text-3xl vault-text tracking-[0.2em]">OVERVIEW</h2>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <Stat label="Total PnL" val={`${total >= 0 ? '+' : ''}${fmt(total)}`} cls={total >= 0 ? 'pp' : 'pl'} sub={`${accounts.length} accounts`} />
+                        <Stat label="Accounts" val={accounts.length} cls="text-v-gold" />
+                        <Stat label="In Profit" val={accounts.filter(a => pnl(a) >= 0).length} cls="text-v-profit" sub="accounts positive" />
+                    </div>
+
+                    {/* VIP bars */}
+                    <div className="bg-v-card rounded-2xl p-5 gb">
+                        <p className="text-[10px] uppercase tracking-widest text-v-gold mb-4">VIP Distribution</p>
+                        <div className="space-y-3">
+                            {VIP.map(v => {
+                                const c = byVip[v] || 0;
+                                const pct = accounts.length ? Math.round(c / accounts.length * 100) : 0;
+                                return (
+                                    <div key={v} className="flex items-center gap-3">
+                                        <span className="text-xs text-v-muted w-20 shrink-0">{v}</span>
+                                        <div className="flex-1 bg-v-border/40 rounded-full h-1.5 overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#c9a84c,#e8c96a)', transition: 'width .4s ease' }} />
+                                        </div>
+                                        <span className="text-xs text-v-tx w-5 text-right tabular-nums">{c}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {[{ title: 'Top Performers', color: 'text-v-profit', sign: '+', list: sorted.slice(0, 3) },
+                        { title: 'Worst Performers', color: 'text-v-loss', sign: '', list: sorted.slice(-3).reverse() }].map(g => (
+                            <div key={g.title} className="bg-v-card rounded-2xl p-4 gb">
+                                <p className={`text-[10px] uppercase tracking-widest mb-3 ${g.color}`}>{g.title}</p>
+                                {g.list.length === 0 && <p className="text-v-muted text-xs">No accounts yet</p>}
+                                {g.list.map((a, i) => {
+                                    const p2 = pnl(a);
+                                    return (
+                                        <div key={a.id} className="flex items-center gap-2 py-1.5 border-b border-v-border/40 last:border-0">
+                                            <span className="text-v-muted/60 text-[11px] w-4">{i + 1}.</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-v-tx truncate">{a.stake_id}</p>
+                                                <p className="text-[10px] text-v-muted">{a.vip_level}</p>
+                                            </div>
+                                            <span className={`text-sm font-semibold ${p2 >= 0 ? 'text-v-profit' : 'text-v-loss'}`}>
+                                                {p2 >= 0 ? '+' : ''}{fmt(p2)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── MESSAGES ─────────────────────────────────────────────────────────────────
+        function Messages({ user }) {
+            const [msgs, setMsgs] = useState([]);
+            const [txt, setTxt] = useState('');
+            const [busy, setBusy] = useState(false);
+            const bottomRef = useRef(null);
+
+            useEffect(() => {
+                // Initial fetch
+                sb.from('messages').select('*').order('created_at', { ascending: true }).then(({ data }) => { if (data) setMsgs(data); });
+
+                // Realtime subscription
+                const ch = sb.channel('messages_rt')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => {
+                        setMsgs(prev => [...prev, p.new]);
+                        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                    }).subscribe();
+                return () => sb.removeChannel(ch);
+            }, []);
+
+            useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
+
+            const send = async e => {
+                e.preventDefault(); if (!txt.trim()) return;
+                setBusy(true);
+                await sb.from('messages').insert({
+                    text: txt.trim(),
+                    sender_email: user.email,
+                    sender_name: user.email.split('@')[0],
+                });
+                setTxt(''); setBusy(false);
+            };
+
+            return (
+                <div className="flex flex-col h-full fi">
+                    <h2 className="font-d text-2xl vault-text tracking-[0.15em] mb-4 shrink-0">GROUP CHAT</h2>
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                        {msgs.length === 0 && <div className="flex items-center justify-center h-28 text-v-muted text-sm">No messages yet. Say something!</div>}
+                        {msgs.map(m => {
+                            const me = m.sender_email === user.email;
+                            return (
+                                <div key={m.id} className={`flex gap-2 ${me ? 'flex-row-reverse' : ''}`}>
+                                    <div className="w-8 h-8 rounded-full bg-v-gold/15 border border-v-gold/30 flex items-center justify-center shrink-0 text-v-gold text-xs font-bold">
+                                        {(m.sender_name || '?')[0].toUpperCase()}
+                                    </div>
+                                    <div className={`max-w-xs ${me ? 'items-end' : 'items-start'} flex flex-col`}>
+                                        <div className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${me ? 'bg-v-gold text-v-bg rounded-tr-none' : 'bg-v-card text-v-tx rounded-tl-none gb'}`}>
+                                            {m.text}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5 px-1">
+                                            <span className="text-[10px] text-v-muted">{m.sender_name}</span>
+                                            <span className="text-v-border">·</span>
+                                            <span className="text-[10px] text-v-muted">{tsFmt(m.created_at)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={bottomRef} />
+                    </div>
+                    <form onSubmit={send} className="flex gap-2 mt-4 pt-3 border-t border-v-border shrink-0">
+                        <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Type a message…"
+                            className="flex-1 bg-v-inp border border-v-border rounded-xl px-4 py-2.5 text-sm text-v-tx focus:outline-none focus:border-v-gold transition-colors" />
+                        <button type="submit" disabled={busy || !txt.trim()}
+                            className="bg-v-gold text-v-bg px-5 py-2.5 rounded-xl font-d tracking-widest text-sm hover:bg-v-gd transition-all disabled:opacity-40"
+                            style={{ boxShadow: '0 2px 12px #c9a84c20' }}>
+                            SEND
+                        </button>
+                    </form>
+                </div>
+            );
+        }
+
+        // ─── MAIN AREA ────────────────────────────────────────────────────────────────
+        function MainArea({ view, accounts, activeId, onSelect, user }) {
+            const [editMode, setEditMode] = useState(false);
+            const [saving, setSaving] = useState(false);
+            const acc = accounts.find(a => a.id === activeId);
+
+            useEffect(() => setEditMode(false), [activeId]);
+
+            const save = async fd => {
+                setSaving(true);
+                const payload = {
+                    stake_id: fd.stake_id, vip_level: fd.vip_level,
+                    wag_cost: +fd.wag_cost || 0, claimer_cost: +fd.claimer_cost || 0, credit_cost: +fd.credit_cost || 0,
+                    rain: +fd.rain || 0, has_kyc: !!fd.has_kyc, crypto_bonus: +fd.crypto_bonus || 0,
+                    monthly_bonus: +fd.monthly_bonus || 0, weekly_bonus: +fd.weekly_bonus || 0,
+                    bonus_type: fd.bonus_type, bonus_amount: +fd.bonus_amount || 0, kick_codes: +fd.kick_codes || 0,
+                    updated_at: new Date().toISOString(), updated_by: user.email,
+                };
+                if (activeId === '__new__') {
+                    await sb.from('accounts').insert(payload);
+                    onSelect(null);
+                } else {
+                    await sb.from('accounts').update(payload).eq('id', activeId);
+                }
+                setSaving(false); setEditMode(false);
+            };
+
+            const del = async () => {
+                if (!window.confirm(`Delete "${acc?.stake_id}"? This cannot be undone.`)) return;
+                await sb.from('accounts').delete().eq('id', activeId);
+                onSelect(null);
+            };
+
+            const wrap = (children) => (
+                <div className="p-4 sm:p-6 overflow-y-auto h-full">{children}</div>
+            );
+
+            if (view === 'summary') return wrap(<Summary accounts={accounts} />);
+            if (view === 'messages') return (
+                <div className="p-4 sm:p-6 flex flex-col h-full overflow-hidden"><Messages user={user} /></div>
+            );
+
+            if (!activeId) return (
+                <div className="flex flex-col items-center justify-center h-full text-v-muted fi gap-3">
+                    <div className="w-16 h-16 rounded-2xl bg-v-surf border border-v-border flex items-center justify-center">
+                        <img src="https://stake.ac/favicon.ico" alt="" width="32" height="32" className="rounded opacity-40" />
+                    </div>
+                    <p className="text-sm">Select an account or add a new one</p>
+                </div>
+            );
+
+            if (activeId === '__new__' || editMode) return wrap(
+                <>
+                    <h2 className="font-d text-3xl vault-text tracking-[0.15em] mb-5">
+                        {activeId === '__new__' ? 'NEW ACCOUNT' : `EDIT — ${acc?.stake_id}`}
+                    </h2>
+                    <AccountForm
+                        initial={activeId === '__new__' ? null : acc}
+                        onSave={save}
+                        onCancel={() => { setEditMode(false); if (activeId === '__new__') onSelect(null); }}
+                        saving={saving}
+                    />
+                </>
+            );
+
+            if (acc) return wrap(<AccountDetail acc={acc} onEdit={() => setEditMode(true)} onDelete={del} />);
+            return null;
+        }
+
+        // ─── APP ──────────────────────────────────────────────────────────────────────
+        function App() {
+            const [user, setUser] = useState(undefined);
+            const [accounts, setAccounts] = useState([]);
+            const [activeId, setActiveId] = useState(null);
+            const [view, setView] = useState('accounts');
+            const [sidebarOpen, setSidebar] = useState(false);
+
+            // ── Auth ──────────────────────────────────────────────────────────────────
+            useEffect(() => {
+                // Whitelist check only runs at SIGN-IN time, never on refresh.
+                // If a user has a valid Supabase session, they already passed it.
+                const checkWhitelist = async (email) => {
+                    try {
+                        const { data } = await sb.from('whitelist')
+                            .select('id').eq('email', email.toLowerCase()).maybeSingle();
+                        return !!data;
+                    } catch { return true; }
+                };
+
+                // Safety net: if onAuthStateChange never fires in 8s, bail to login
+                const fallback = setTimeout(() =>
+                    setUser(prev => prev === undefined ? null : prev), 8000);
+
+                const { data: { subscription } } = sb.auth.onAuthStateChange((ev, session) => {
+                    clearTimeout(fallback);
+
+                    if (ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') {
+                        // Restore user instantly from token — NO network call
+                        setUser(session?.user ?? null);
+                        return;
+                    }
+
+                    if (ev === 'SIGNED_IN' && session?.user) {
+                        // Only on explicit login: hit DB to verify whitelist
+                        checkWhitelist(session.user.email).then(ok => {
+                            if (!ok) { sb.auth.signOut(); setUser(null); return; }
+                            setUser(session.user);
+                        });
+                        return;
+                    }
+
+                    if (ev === 'SIGNED_OUT') {
+                        setUser(null);
+                    }
+                });
+
+                return () => { clearTimeout(fallback); subscription.unsubscribe(); };
+            }, []);
+
+
+            // Accounts realtime
+            useEffect(() => {
+                if (!user) return;
+                sb.from('accounts').select('*').order('stake_id', { ascending: true }).then(({ data }) => { if (data) setAccounts(data); });
+                const ch = sb.channel('accounts_rt')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, () => {
+                        sb.from('accounts').select('*').order('stake_id', { ascending: true }).then(({ data }) => { if (data) setAccounts(data); });
+                    }).subscribe();
+                return () => sb.removeChannel(ch);
+            }, [user]);
+
+            if (user === undefined) return (
+                <div className="min-h-screen bg-v-bg flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-10 h-10 border-2 border-v-gold/30 border-t-v-gold rounded-full spin" />
+                        <span className="font-d text-xl vault-text tracking-widest">VAULT</span>
+                    </div>
+                </div>
+            );
+
+            if (!user) return <LoginScreen />;
+
+            const addAcc = () => { setActiveId('__new__'); setView('accounts'); setSidebar(false); };
+            const selAcc = id => { setActiveId(id); setView('accounts'); setSidebar(false); };
+            const switchView = v => { setView(v); if (v !== 'accounts') setActiveId(null); setSidebar(false); };
+
+            return (
+                <div className="flex flex-col h-screen overflow-hidden bg-v-bg">
+                    <Navbar user={user} onMenu={() => setSidebar(o => !o)} />
+                    <div className="flex flex-1 overflow-hidden relative">
+                        {/* Mobile overlay */}
+                        {sidebarOpen && <div className="fixed inset-0 bg-black/70 z-40 md:hidden" onClick={() => setSidebar(false)} />}
+                        {/* Sidebar */}
+                        <div className={`${sidebarOpen ? 'fixed inset-y-14 left-0 z-50 w-64' : 'hidden md:block'} h-[calc(100vh-3.5rem)]`}>
+                            <Sidebar accounts={accounts} activeId={activeId} onSelect={selAcc} onAdd={addAcc}
+                                onView={switchView} view={view} open={sidebarOpen} />
+                        </div>
+                        {/* Main */}
+                        <main className="flex-1 overflow-hidden carbon">
+                            <MainArea view={view} accounts={accounts} activeId={activeId} onSelect={selAcc} user={user} />
+                        </main>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+
+</html>
