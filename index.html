@@ -590,7 +590,8 @@
         // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
         function Sidebar({ accounts, activeId, onSelect, onAdd, onView, view, open }) {
             return (
-                <aside className={`${open ? 'flex' : 'hidden md:flex'} flex-col w-64 bg-v-surf border-r border-v-border h-full shrink-0`}>
+                <aside className={`${open ? 'flex' : 'hidden md:flex'} flex-col w-64 bg-v-surf border-r border-v-border shrink-0`}
+                    style={{ height: open ? 'calc(100vh - 3.5rem)' : '100%', overflow: 'hidden' }}>
                     {/* Tabs */}
                     <div className="flex border-b border-v-border shrink-0">
                         {[
@@ -1154,10 +1155,11 @@
                 <div className="flex flex-col h-screen overflow-hidden bg-v-bg">
                     <Navbar user={user} onMenu={() => setSidebar(o => !o)} />
                     <div className="flex flex-1 overflow-hidden relative">
-                        {/* Mobile overlay */}
+                        {/* Mobile overlay backdrop */}
                         {sidebarOpen && <div className="fixed inset-0 bg-black/70 z-40 md:hidden" onClick={() => setSidebar(false)} />}
-                        {/* Sidebar */}
-                        <div className={`${sidebarOpen ? 'fixed inset-y-14 left-0 z-50 w-64' : 'hidden md:block'} h-[calc(100vh-3.5rem)]`}>
+                        {/* Sidebar — fixed overlay on mobile, static column on desktop */}
+                        <div className={`${sidebarOpen ? 'fixed top-14 left-0 z-50 w-64' : 'hidden md:flex'} md:static md:w-64 md:h-full flex-col`}
+                            style={sidebarOpen ? { height: 'calc(100vh - 3.5rem)' } : {}}>
                             <Sidebar accounts={accounts} activeId={activeId} onSelect={selAcc} onAdd={addAcc}
                                 onView={switchView} view={view} open={sidebarOpen} />
                         </div>
